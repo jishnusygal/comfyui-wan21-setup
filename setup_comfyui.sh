@@ -3,7 +3,7 @@
 # ComfyUI WAN 2.1 Complete Setup Script for Pop!_OS
 # This script automates the entire installation and configuration process
 
-set -e  # Exit on any error
+set -e # Exit on any error
 
 # Colors for output
 RED='\033[0;31m'
@@ -52,22 +52,22 @@ check_os() {
 # Check system requirements
 check_requirements() {
     print_header "CHECKING SYSTEM REQUIREMENTS"
-    
+
     # Check available disk space (need at least 20GB)
     available_space=$(df -h "$HOME" | awk 'NR==2 {print $4}' | sed 's/G//')
     if [[ ${available_space%.*} -lt 20 ]]; then
         print_error "Insufficient disk space. Need at least 20GB available."
         exit 1
     fi
-    
+
     # Check RAM (recommend at least 8GB)
     total_ram=$(free -g | awk 'NR==2{print $2}')
     if [[ $total_ram -lt 8 ]]; then
         print_warning "Less than 8GB RAM detected. Consider using --lowvram flag"
     fi
-    
+
     # Check GPU
-    if command -v nvidia-smi &> /dev/null; then
+    if command -v nvidia-smi &>/dev/null; then
         print_status "NVIDIA GPU detected:"
         nvidia-smi --query-gpu=name,memory.total --format=csv,noheader
     else
@@ -78,7 +78,7 @@ check_requirements() {
 # Install system dependencies
 install_dependencies() {
     print_header "INSTALLING SYSTEM DEPENDENCIES"
-    
+
     sudo apt update
     sudo apt install -y \
         python3 \
@@ -96,22 +96,21 @@ install_dependencies() {
         libxrender-dev \
         libgomp1 \
         ffmpeg
-    
+
     # Install NVIDIA drivers and CUDA if GPU detected
-    if lspci | grep -i nvidia > /dev/null; then
-        print_status "Installing NVIDIA drivers and CUDA toolkit..."
-        sudo apt install -y nvidia-driver-525 nvidia-cuda-toolkit
-        
-        # Add CUDA to PATH
-        echo 'export PATH=/usr/local/cuda/bin:$PATH' >> ~/.bashrc
-        echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc
+    if lspci | grep -i nvidia >/dev/null; then
+        print_warning "NVIDIA GPU detected.\nPlease install the latest NVIDIA drivers and CUDA toolkit manually from the official NVIDIA website: https://www.nvidia.com/Download/index.aspx and https://developer.nvidia.com/cuda-downloads.\nSkipping automatic installation to avoid system issues."
+        # Do NOT install drivers or CUDA automatically
+        # sudo apt install -y nvidia-driver-525 nvidia-cuda-toolkit
+        # echo 'export PATH=/usr/local/cuda/bin:$PATH' >> ~/.bashrc
+        # echo 'export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH' >> ~/.bashrc
     fi
 }
 
 # Create workspace directory
 create_workspace() {
     print_header "CREATING WORKSPACE"
-    
+
     mkdir -p "$WORKSPACE_DIR"
     cd "$WORKSPACE_DIR"
     print_status "Created workspace at $WORKSPACE_DIR"
@@ -120,7 +119,7 @@ create_workspace() {
 # Clone and setup ComfyUI
 setup_comfyui() {
     print_header "SETTING UP COMFYUI"
-    
+
     # Clone ComfyUI
     if [[ -d "$INSTALL_DIR" ]]; then
         print_warning "ComfyUI directory already exists. Updating..."
@@ -131,23 +130,23 @@ setup_comfyui() {
         git clone https://github.com/comfyanonymous/ComfyUI.git "$INSTALL_DIR"
         cd "$INSTALL_DIR"
     fi
-    
+
     # Create virtual environment
     print_status "Creating Python virtual environment..."
     python3 -m venv venv
     source venv/bin/activate
-    
+
     # Upgrade pip
     pip install --upgrade pip
-    
+
     # Install PyTorch with CUDA support
     print_status "Installing PyTorch with CUDA support..."
     pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-    
+
     # Install ComfyUI requirements
     print_status "Installing ComfyUI requirements..."
     pip install -r requirements.txt
-    
+
     # Install additional useful packages
     pip install \
         opencv-python \
@@ -161,34 +160,34 @@ setup_comfyui() {
 # Create directory structure
 create_directories() {
     print_header "CREATING DIRECTORY STRUCTURE"
-    
+
     cd "$INSTALL_DIR"
-    
+
     # Create model directories
     mkdir -p models/{checkpoints,vae,clip,unet,loras,embeddings,upscale_models,controlnet}
     mkdir -p custom_nodes
     mkdir -p input
     mkdir -p output
-    
+
     print_status "Created model directories"
 }
 
 # Download WAN 2.1 model
 download_wan21() {
     print_header "DOWNLOADING WAN 2.1 MODEL"
-    
+
     cd "$INSTALL_DIR/models/checkpoints"
-    
+
     # WAN 2.1 model download URLs (you may need to update these)
     WAN21_URL="https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors"
     WAN21_REFINER_URL="https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0/resolve/main/sd_xl_refiner_1.0.safetensors"
-    
+
     print_status "Downloading WAN 2.1 base model..."
     wget -O "wan21_base.safetensors" "$WAN21_URL" || {
         print_error "Failed to download WAN 2.1 base model"
         print_warning "You may need to manually download the model from the official source"
     }
-    
+
     print_status "Downloading WAN 2.1 refiner model..."
     wget -O "wan21_refiner.safetensors" "$WAN21_REFINER_URL" || {
         print_error "Failed to download WAN 2.1 refiner model"
@@ -199,19 +198,19 @@ download_wan21() {
 # Download additional models
 download_additional_models() {
     print_header "DOWNLOADING ADDITIONAL MODELS"
-    
+
     cd "$INSTALL_DIR/models"
-    
+
     # VAE models
     cd vae
     print_status "Downloading VAE models..."
     wget -O "sdxl_vae.safetensors" "https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors"
-    
+
     # ControlNet models
     cd ../controlnet
     print_status "Downloading ControlNet models..."
     wget -O "canny_controlnet.safetensors" "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/diffusers_xl_canny_full.safetensors"
-    
+
     # Upscale models
     cd ../upscale_models
     print_status "Downloading upscale models..."
@@ -221,22 +220,22 @@ download_additional_models() {
 # Install useful custom nodes
 install_custom_nodes() {
     print_header "INSTALLING CUSTOM NODES"
-    
+
     cd "$INSTALL_DIR/custom_nodes"
-    
+
     # ComfyUI Manager
     print_status "Installing ComfyUI Manager..."
     git clone https://github.com/ltdrdata/ComfyUI-Manager.git
-    
+
     # Additional useful nodes
     print_status "Installing additional custom nodes..."
-    
+
     # Efficiency Nodes
     git clone https://github.com/jags111/efficiency-nodes-comfyui.git
-    
+
     # ControlNet Aux
     git clone https://github.com/Fannovel16/comfyui_controlnet_aux.git
-    
+
     # Image Saver
     git clone https://github.com/giriss/comfy-image-saver.git
 }
@@ -244,11 +243,11 @@ install_custom_nodes() {
 # Create launch scripts
 create_launch_scripts() {
     print_header "CREATING LAUNCH SCRIPTS"
-    
+
     cd "$INSTALL_DIR"
-    
+
     # Create main launch script
-    cat > launch.sh << 'EOF'
+    cat >launch.sh <<'EOF'
 #!/bin/bash
 cd "$(dirname "$0")"
 source venv/bin/activate
@@ -274,38 +273,38 @@ fi
 echo "Starting ComfyUI with flags: $LAUNCH_FLAGS"
 python main.py --listen 0.0.0.0 --port 8188 $LAUNCH_FLAGS
 EOF
-    
+
     # Create CPU-only launch script
-    cat > launch_cpu.sh << 'EOF'
+    cat >launch_cpu.sh <<'EOF'
 #!/bin/bash
 cd "$(dirname "$0")"
 source venv/bin/activate
 echo "Starting ComfyUI in CPU mode"
 python main.py --listen 0.0.0.0 --port 8188 --cpu
 EOF
-    
+
     # Create development launch script
-    cat > launch_dev.sh << 'EOF'
+    cat >launch_dev.sh <<'EOF'
 #!/bin/bash
 cd "$(dirname "$0")"
 source venv/bin/activate
 echo "Starting ComfyUI in development mode"
 python main.py --listen 0.0.0.0 --port 8188 --enable-cors-header --verbose
 EOF
-    
+
     # Make scripts executable
     chmod +x launch.sh launch_cpu.sh launch_dev.sh
-    
+
     print_status "Created launch scripts"
 }
 
 # Create desktop entry
 create_desktop_entry() {
     print_header "CREATING DESKTOP ENTRY"
-    
+
     mkdir -p ~/.local/share/applications
-    
-    cat > ~/.local/share/applications/comfyui.desktop << EOF
+
+    cat >~/.local/share/applications/comfyui.desktop <<EOF
 [Desktop Entry]
 Name=ComfyUI
 Comment=Stable Diffusion GUI
@@ -317,18 +316,18 @@ Path=$INSTALL_DIR
 Terminal=true
 StartupNotify=true
 EOF
-    
+
     print_status "Created desktop entry"
 }
 
 # Create configuration file
 create_config() {
     print_header "CREATING CONFIGURATION FILES"
-    
+
     cd "$INSTALL_DIR"
-    
+
     # Create extra_model_paths.yaml
-    cat > extra_model_paths.yaml << EOF
+    cat >extra_model_paths.yaml <<EOF
 # Extra model paths for ComfyUI
 # Add your custom model paths here
 
@@ -343,17 +342,17 @@ embeddings: models/embeddings/
 upscale_models: models/upscale_models/
 controlnet: models/controlnet/
 EOF
-    
+
     # Create workflow examples directory
     mkdir -p workflows
-    
+
     print_status "Created configuration files"
 }
 
 # Final setup and instructions
 final_setup() {
     print_header "FINAL SETUP AND INSTRUCTIONS"
-    
+
     print_status "Installation completed successfully!"
     echo ""
     echo "🚀 ComfyUI with WAN 2.1 Setup Complete!"
@@ -390,9 +389,9 @@ final_setup() {
     echo "🔄 To update ComfyUI in the future:"
     echo "   cd $INSTALL_DIR && git pull"
     echo ""
-    
+
     # Create a simple test workflow
-    cat > "$INSTALL_DIR/workflows/test_wan21.json" << 'EOF'
+    cat >"$INSTALL_DIR/workflows/test_wan21.json" <<'EOF'
 {
   "3": {
     "inputs": {
@@ -453,7 +452,7 @@ final_setup() {
   }
 }
 EOF
-    
+
     print_status "Created test workflow: $INSTALL_DIR/workflows/test_wan21.json"
 }
 
@@ -469,7 +468,7 @@ main() {
         echo "Installation cancelled."
         exit 1
     fi
-    
+
     check_os
     check_requirements
     install_dependencies
@@ -483,7 +482,7 @@ main() {
     create_desktop_entry
     create_config
     final_setup
-    
+
     print_status "Setup completed! You can now start ComfyUI with: cd $INSTALL_DIR && ./launch.sh"
 }
 
